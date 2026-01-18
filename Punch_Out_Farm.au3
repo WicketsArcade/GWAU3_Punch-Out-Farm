@@ -10,8 +10,6 @@
 #include "AddOns\GwAu3_AddOns_Punch_Out_Farm.au3"
 #include "GUI\GUI_Punch_Out_Farm.au3"
 #include "..\API\SmartCast\_UtilityAI.au3"
-#include "..\API\Modules\Cmd\GwAu3_Cmd_NPC.au3"
-#include "..\API\Modules\Cmd\GwAu3_Cmd_Dialog.au3"
 #include "..\API\Pathfinding\Pathfinder_Movements.au3"
 #EndRegion Includes
 
@@ -260,17 +258,14 @@ Func RunPunchOutSequence()
     ; Move to safe start position
     Pathfinder_MoveTo(-16919.56, -13485.12)
     Sleep(500)
-
+    PickUpLoot()
     ; Cache skills ONCE at start
     UAI_CacheSkillBar()
 
     ; Fight initial spawns
     Update("Fighting at start position")
     Brawling_ClearArea(1500)
-       
-    PickUpLoot()
-    
-    Update("Fronis Instance Combat Loop Started")
+    Update("Started")
     Local $aWaypoints[10][2] = [ _
         [-15115.72, -15375.61], _
         [-11299.54, -16402.40], _
@@ -321,8 +316,8 @@ Func RunPunchOutSequence()
                 
                 Brawling_ClearArea(1500)
             EndIf        
-            Sleep(100)
-        WEnd
+            Sleep(500)
+               WEnd
         
         ; Clear area at waypoint
         ; Update("Fighting at waypoint " & $i + 1)
@@ -363,15 +358,7 @@ Func RunPunchOutSequence()
     
     Sleep(2000)
     Update("Fronis Instance Completed")
-    Update("Picking up ale")
-    
-    ; Ensure Ale is picked up
-    Local $l_timerLoot = TimerInit()
-    Do
-        PickUpLoot()
-        Sleep(500)
-    Until TimerDiff($l_timerLoot) > 5000 ; Try for 5 seconds max
-    
+    Update("Picking up ale")   
     $g_i_Runs += 1
     $g_i_Ales += 1 ; Increment count (Assuming success)
     UpdateGUIStats()

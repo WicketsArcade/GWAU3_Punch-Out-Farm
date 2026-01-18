@@ -5,7 +5,6 @@ Global Const $RARITY_Gold = 2624
 Global Const $RARITY_Purple = 2626
 Global Const $RARITY_Blue = 2623
 Global Const $RARITY_White = 2621
-
 Global Const $ITEM_ID_Lockpicks = 22751
 Global Const $ITEM_ID_Dyes = 146
 Global Const $ITEM_ExtraID_BlackDye = 10
@@ -208,19 +207,62 @@ Func Brawling_ClearArea($range = 1500)
         Sleep(500)
     WEnd
 EndFunc
+
+Func Brawling_MoveTo($aDestX, $aDestY, $aAggroRange = 1500)
+    Local $lMyX, $lMyY
+    
+    ; Initial Path Calculation
+    Pathfinder_Initialize()
+    Local $lPath = _Pathfinder_GetPath(Agent_GetAgentInfo(-2, "X"), Agent_GetAgentInfo(-2, "Y"), Agent_GetAgentInfo(-2, "Plane"), $aDestX, $aDestY, 0)
+    
+    If Not IsArray($lPath) Then
+        Out("Path calculation failed. Moving directly.")
+        Map_Move($aDestX, $aDestY)
+        Return
+    EndIf
+    
+    Local $iPathIndex = 0
+    Local $lTimer = TimerInit()
+    
+    While True
+        If GetPartyDead() Then Return
+        If TimerDiff($lTimer) > 60000 Then 
+            Out("Movement Timeout")
+            Return
+        EndIf
+        
+        $lMyX = Agent_GetAgentInfo(-2, "X")
+        $lMyY = Agent_GetAgentInfo(-2, "Y")
+        
+        ; Check if reached destination
+        If Agent_GetDistanceToXY($aDestX, $aDestY) < 250 Then ExitLoop
+        
+        ; Fight & Loot using Aggro Range
+        If GetNumberOfFoesInRangeOfAgent(-2, $aAggroRange) > 0 Then
+            Brawling_ClearArea($aAggroRange)
+            PickUpLoot()
+        EndIf
+        
+        ; Move along path
+        If $iPathIndex < UBound($lPath) Then
+            Local $lWpX = $lPath[$iPathIndex][0]
+            Local $lWpY = $lPath[$iPathIndex][1]
+            
+            If Agent_GetDistanceToXY($lWpX, $lWpY) < 250 Then
+                $iPathIndex += 1
+            Else
+                Map_Move($lWpX, $lWpY)
+            EndIf
+        Else
+            Map_Move($aDestX, $aDestY)
+        EndIf
+        
+        Sleep(100)
+    WEnd
+EndFunc
 #EndRegion Combat
 
 #Region Loot
-Func CountSlots()
-    Local $bag
-    Local $temp = 0
-    For $i = 1 To 4
-        $bag = Item_GetBagPtr($i)
-        $temp += Item_GetBagInfo($bag, "EmptySlots")
-    Next
-    Return $temp
-EndFunc   ;==>CountSlots
-
 Func PickUpLoot()
     Local $lAgentArray = Item_GetItemArray()
     Local $maxitems = $lAgentArray[0]
@@ -248,4 +290,52 @@ EndFunc   ;==>PickUpLoot
 Func GetItemAgentExists($aItemAgentID)
     Return (Agent_GetAgentPtr($aItemAgentID) > 0 And $aItemAgentID < Item_GetMaxItems())
 EndFunc   ;==>GetItemAgentExists
+
+Func CanPickUp($aItemPtr)
+    Local $lModelID = Item_GetItemInfoByPtr($aItemPtr, "ModelID")
+    Local $aExtraID = Item_GetItemInfoByPtr($aItemPtr, "ExtraID")
+    Local $lRarity = Item_GetItemInfoByPtr($aItemPtr, "Rarity")
+    
+    If (($lModelID == 2511) And (Item_GetInventoryInfo("GoldCharacter") < 99000)) Then
+        Return True ; gold coins (only pick if character has less than 99k in inventory)
+    ElseIf ($lModelID == $ITEM_ID_Dyes) Then ; if dye
+        If (($aExtraID == $ITEM_ExtraID_BlackDye) Or ($aExtraID == $ITEM_ExtraID_WhiteDye)) Then ; only pick white and black ones
+            Return True
+        EndIf
+    Elseif ($RARITY_White == $lRarity) Then ; white items
+        Return True
+    Elseif ($RARITY_Blue == $lRarity) Then ;blue items
+        Return True
+    ElseIf ($lRarity == $RARITY_Gold) Then ; gold items
+        Return True
+    ElseIf ($lRarity == $RARITY_Purple) Then ; purple items
+        Return False
+    ElseIf ($lModelID == $ITEM_ID_Lockpicks) Then
+        Return True ; Lockpicks
+    ElseIf ($lModelID == 27044) Then
+        Return True ; Stone Summit Emblem
+    ElseIf $lModelID == 5585 Then ; Dwarven Ale
+        Return True
+    ElseIf ($lModelID == 24593) Then ; Aged Dwarven Ale
+        Return True ; Aged Dwarven Ale
+    ElseIf IsPcon($aItemPtr) Then ; ==== Pcons ==== or all event items
+        Return False
+    ElseIf IsRareMaterial($aItemPtr) Then ; rare Mats
+        Return True
+    Else
+        Return False
+    EndIf
+EndFunc   ;==>CanPickUp
+
+Func IsPcon($aItemPtr)
+    Local $lModelID = Item_GetItemInfoByPtr($aItemPtr, "ModelID")
+    For $i = 1 To $GC_AI_PCONS[0]
+        If $GC_AI_PCONS[$i] = $lModelID Then Return True
+    Next
+    Return False
+EndFunc
+
+Func IsRareMaterial($aItemPtr)
+    Return Item_GetItemIsRareMaterial($aItemPtr)
+EndFunc
 #EndRegion Loot
