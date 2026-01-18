@@ -1,84 +1,29 @@
 #include-once
 
-; Global variable declarations
-Global $g_h_EditText
+; === Constants ===
+Global Const $RARITY_Gold = 2624
+Global Const $RARITY_Purple = 2626
+Global Const $RARITY_Blue = 2623
+Global Const $RARITY_White = 2621
 
-#Region Travel
-Func RndTravel($aMapID)
-	Local $UseDistricts = 7 ; 7=eu, 8=eu+int, 11=all(incl. asia)
-	; Region/Language order: eu-en, eu-fr, eu-ge, eu-it, eu-sp, eu-po, eu-ru, int, asia-ko, asia-ch, asia-ja
-	Local $Region[11]   = [2, 2, 2, 2, 2, 2, 2, -2, 1, 3, 4]
-	Local $Language[11] = [0, 2, 3, 4, 5, 9, 10, 0, 0, 0, 0]
-	Local $Random = Random(0, $UseDistricts - 1, 1)
-;~ 	MoveMap($aMapID, $Region[$Random], 0, $Language[$Random])
-	Map_MoveMap($aMapID, $Region[$Random], 0, $Language[5])
-	Map_WaitMapLoading($aMapID, 0)
-	Sleep(1000)
-EndFunc   ;==>RndTravel
-#EndRegion Travel
+Global Const $ITEM_ID_Lockpicks = 22751
+Global Const $ITEM_ID_Dyes = 146
+Global Const $ITEM_ExtraID_BlackDye = 10
+Global Const $ITEM_ExtraID_WhiteDye = 12
+
+; === Global Variables ===
+Global $g_h_EditText
 
 #Region Other
 Func GetIsDead($aAgent = -2)
-	Return Agent_GetAgentInfo($aAgent, "IsDead")
-EndFunc	;==>GetisDead
+    Return Agent_GetAgentInfo($aAgent, "IsDead")
+EndFunc   ;==>GetIsDead
 
 Func GetPartyDead()
-	; Simplified to just check player since heroes are kicked
-	Return GetIsDead(-2)
-EndFunc ;==> GetPartyDead
-#Region Loot
-Func PickUpLoot()
-    If GetPartyDead() Then Return
-    Local $l_i_MaxAgents = Agent_GetMaxAgents()
-    Local $l_f_MyX = Agent_GetAgentInfo(-2, "X")
-    Local $l_f_MyY = Agent_GetAgentInfo(-2, "Y")
-    
-    For $i = 1 To $l_i_MaxAgents
-        Local $l_p_Agent = Agent_GetAgentPtr($i)
-        If $l_p_Agent = 0 Then ContinueLoop
-        
-        Local $l_i_Type = Agent_GetAgentInfo($i, "Type")
-        If $l_i_Type <> 0x400 Then ContinueLoop ; 0x400 = Item
-        
-        If Not CanPickUp($i) Then ContinueLoop
-        
-        Local $l_f_ItemX = Agent_GetAgentInfo($i, "X")
-        Local $l_f_ItemY = Agent_GetAgentInfo($i, "Y")
-        Local $l_f_Dist = Sqrt(($l_f_MyX - $l_f_ItemX)^2 + ($l_f_MyY - $l_f_ItemY)^2)
-        
-        If $l_f_Dist < 1500 Then
-            Agent_ChangeTarget($i)
-            Agent_GoNPC($i)
-            Sleep(500)
-            Game_Interact($i)
-            Sleep(500)
-        EndIf
-    Next
-EndFunc
-
-Func GetItemAgentExists($aItemAgentID)
-	Return (Agent_GetAgentPtr($aItemAgentID) > 0 And $aItemAgentID < Item_GetMaxItems())
-EndFunc
-
-Func CanPickUp($aAgentID)
-    Local $lModelID = Agent_GetAgentInfo($aAgentID, 'ModelID')
-    
-    ; Rules derived from Farm-Killroy-Stoneskin.au3
-    ; 146 = Dye (Black/White check omitted for simplicity/compatibility)
-    ; 22751 = Lockpick
-    ; 27044 = Summit Emblem / Iron
-    ; 5585 = Ale
-    ; 24593 = Aged Ale
-    ; 2041 = Iron
-    Switch $lModelID
-        Case 146, 22751, 27044, 5585, 24593, 2041
-            Return True
-    EndSwitch
-    
-    Return False
-EndFunc
-#EndRegion
-#EndRegion
+    ; Simplified to just check player since heroes are kicked
+    Return GetIsDead(-2)
+EndFunc   ;==>GetPartyDead
+#EndRegion Other
 
 #Region Gui
 ;~ Description: Print to console with timestamp
@@ -86,61 +31,59 @@ Func Out($TEXT)
     Local $TEXTLEN = StringLen($TEXT)
     Local $CONSOLELEN = _GUICtrlEdit_GetTextLen($g_h_EditText)
     If $TEXTLEN + $CONSOLELEN > 30000 Then GUICtrlSetData($g_h_EditText, StringRight(_GUICtrlEdit_GetText($g_h_EditText), 30000 - $TEXTLEN - 1000))
-	_GUICtrlRichEdit_SetCharColor($g_h_EditText, $COLOR_BLACK)
+    _GUICtrlRichEdit_SetCharColor($g_h_EditText, $COLOR_BLACK)
     _GUICtrlEdit_AppendText($g_h_EditText, @CRLF & $TEXT)
     _GUICtrlEdit_Scroll($g_h_EditText, 1)
 EndFunc
 
 Func Brawling_LogCombat($sMessage)
     Out($sMessage)
-    FileWriteLine(@ScriptDir & "\CombatLog.txt", "[" & @HOUR & ":" & @MIN & ":" & @SEC & "] " & $sMessage)
 EndFunc
-#EndRegion
-
+#EndRegion Gui
 
 #Region Combat
 Func Brawling_ComputeDistance($x1, $y1, $x2, $y2)
-    Return Sqrt(($x2 - $x1)^2 + ($y2 - $y1)^2)
+    Return Sqrt(($x2 - $x1) ^ 2 + ($y2 - $y1) ^ 2)
 EndFunc
 
 Func Brawling_GetDistance($aAgent1, $aAgent2)
-	Return Brawling_ComputeDistance(Agent_GetAgentInfo($aAgent1, 'X'), Agent_GetAgentInfo($aAgent1, 'Y'), Agent_GetAgentInfo($aAgent2, 'X'), Agent_GetAgentInfo($aAgent2, 'Y'))
+    Return Brawling_ComputeDistance(Agent_GetAgentInfo($aAgent1, 'X'), Agent_GetAgentInfo($aAgent1, 'Y'), Agent_GetAgentInfo($aAgent2, 'X'), Agent_GetAgentInfo($aAgent2, 'Y'))
 EndFunc
 
 Func Brawling_IsRecharged($aSkill)
-	Return Skill_GetSkillbarInfo($aSkill, "IsRecharged")
+    Return Skill_GetSkillbarInfo($aSkill, "IsRecharged")
 EndFunc
 
 Func Brawling_UseSkillEx($aSkill, $aTgt = -2, $aTimeout = 400)
     If GetIsDead(-2) Then Return False
     If Not Brawling_IsRecharged($aSkill) Then Return False
-    
+
     Local $lDeadlock = TimerInit()
     Skill_UseSkill($aSkill, $aTgt)
     Sleep(50) ; Wait for cast start
-    
+
     Do
         Sleep(10)
         If GetIsDead(-2) Then Return False
     Until (Not Brawling_IsRecharged($aSkill)) Or (TimerDiff($lDeadlock) > $aTimeout)
-    
+
     If Not Brawling_IsRecharged($aSkill) Then Return True
     Return False
 EndFunc
 
 Func Brawling_EnemyFilter($aAgentPtr)
-	If Agent_GetAgentInfo($aAgentPtr, 'Allegiance') <> 3 Then Return False
+    If Agent_GetAgentInfo($aAgentPtr, 'Allegiance') <> 3 Then Return False
     If Agent_GetAgentInfo($aAgentPtr, 'HP') <= 0 Then Return False
-	If Agent_GetAgentInfo($aAgentPtr, 'IsDead') > 0 Then Return False
+    If Agent_GetAgentInfo($aAgentPtr, 'IsDead') > 0 Then Return False
     Return True
 EndFunc
 
 Func GetNumberOfFoesInRangeOfAgent($aAgentID = -2, $aRange = 1200, $aType = $GC_I_AGENT_TYPE_LIVING, $aReturnMode = 0, $aCustomFilter = "Brawling_EnemyFilter")
-	Return GetAgents($aAgentID, $aRange, $aType, $aReturnMode, $aCustomFilter)
+    Return GetAgents($aAgentID, $aRange, $aType, $aReturnMode, $aCustomFilter)
 EndFunc
 
 Func GetNearestEnemyToAgent($aAgentID = -2, $aRange = 1320, $aType = $GC_I_AGENT_TYPE_LIVING, $aReturnMode = 1, $aCustomFilter = "Brawling_EnemyFilter")
-	Return GetAgents($aAgentID, $aRange, $aType, $aReturnMode, $aCustomFilter)
+    Return GetAgents($aAgentID, $aRange, $aType, $aReturnMode, $aCustomFilter)
 EndFunc
 
 Func Brawling_Fight($x)
@@ -150,62 +93,62 @@ Func Brawling_Fight($x)
     Local $LocalTimer = TimerInit()
     Local $bRecoveryMode = False
     Local $hRecoveryTimer = 0
-    
+
     Do
-        If GetNumberOfFoesInRangeOfAgent(-2, 1500) = 0 Then Exitloop
-        If TimerDiff($LocalTimer) > 180000 then Exitloop
-        if GetPartyDead() Then ExitLoop
-        
+        If GetNumberOfFoesInRangeOfAgent(-2, 1500) = 0 Then ExitLoop
+        If TimerDiff($LocalTimer) > 180000 Then ExitLoop
+        If GetPartyDead() Then ExitLoop
+
         ; Recovery Logic
         Local $iEnergy = Agent_GetAgentInfo(-2, "CurrentEnergy")
         Local $iMaxEnergy = Agent_GetAgentInfo(-2, "MaxEnergy")
-        
+
         If $iEnergy < 1 Then $bRecoveryMode = True
-        
+
         If $bRecoveryMode Then
-             Skill_UseSkill(8, -2)
-             
-             If $iEnergy >= $iMaxEnergy Then
-                 If $hRecoveryTimer = 0 Then $hRecoveryTimer = TimerInit()
-                 If TimerDiff($hRecoveryTimer) > 2000 Then
-                     $bRecoveryMode = False
-                     $hRecoveryTimer = 0
-                 EndIf
-             Else
-                 $hRecoveryTimer = 0
-             EndIf
-             
-             Sleep(1)
-             ContinueLoop
+            Skill_UseSkill(8, -2)
+
+            If $iEnergy >= $iMaxEnergy Then
+                If $hRecoveryTimer = 0 Then $hRecoveryTimer = TimerInit()
+                If TimerDiff($hRecoveryTimer) > 2000 Then
+                    $bRecoveryMode = False
+                    $hRecoveryTimer = 0
+                EndIf
+            Else
+                $hRecoveryTimer = 0
+            EndIf
+
+            Sleep(1)
+            ContinueLoop
         EndIf
-        
+
         $target = GetNearestEnemyToAgent(-2, 1500, $GC_I_AGENT_TYPE_LIVING, 1, "Brawling_EnemyFilter")
-        If $target = 0 Then 
+        If $target = 0 Then
             Brawling_LogCombat("No targets found. Exiting combat loop.")
             ExitLoop
         EndIf
-        
+
         $distance = Brawling_GetDistance($target, -2)
         Brawling_LogCombat("Target Found: " & Agent_GetAgentInfo($target, 'ID') & " | Distance: " & $distance & " | HP: " & Agent_GetAgentInfo($target, 'HP'))
-        
+
         ; Move to target if out of range
         If $distance > 150 Then ; Brawling range is short
-             Agent_ChangeTarget($target)
-             Agent_Attack($target)
-             Sleep(250)
-             $distance = Brawling_GetDistance($target, -2)
-             
-             If $distance > 200 Then
-                 Brawling_LogCombat("Target too far (" & $distance & "). Moving closer...")
-                 Map_Move(Agent_GetAgentInfo($target, 'X'), Agent_GetAgentInfo($target, 'Y'))
-                 Local $MoveTimer = TimerInit()
-                 Do
+            Agent_ChangeTarget($target)
+            Agent_Attack($target)
+            Sleep(250)
+            $distance = Brawling_GetDistance($target, -2)
+
+            If $distance > 200 Then
+                Brawling_LogCombat("Target too far (" & $distance & "). Moving closer...")
+                Map_Move(Agent_GetAgentInfo($target, 'X'), Agent_GetAgentInfo($target, 'Y'))
+                Local $MoveTimer = TimerInit()
+                Do
                     Sleep(100)
                     $distance = Brawling_GetDistance($target, -2)
-                 Until $distance < 200 Or TimerDiff($MoveTimer) > 3000 Or GetPartyDead()
-             EndIf
+                Until $distance < 200 Or TimerDiff($MoveTimer) > 3000 Or GetPartyDead()
+            EndIf
         EndIf
-        
+
         ; Combat Loop (Cycle skills once then re-evaluate)
         If $distance < 300 Then
             UAI_CacheSkillBar() ; Refresh skill cache before combat
@@ -218,10 +161,10 @@ Func Brawling_Fight($x)
                     ; Check adrenaline requirements
                     Local $iAdrenaline = Skill_GetSkillbarInfo($i, "Adrenaline")
                     Local $iCost = Skill_GetSkillInfo(Skill_GetSkillbarInfo($i, "ID"), "Adrenaline")
-                    
+
                     If $iAdrenaline >= $iCost Then
                         Local $bUsed = False
-                        
+
                         ; Smartcast Logic for Skill 1 (Priority)
                         If $i = 1 Then
                             ; Cast regardless of range if it's a movement/charge skill or self-buff
@@ -230,7 +173,7 @@ Func Brawling_Fight($x)
                         Else
                             $bUsed = Brawling_UseSkillEx($i, $target)
                         EndIf
-                        
+
                         If $bUsed Then
                             Brawling_LogCombat("Used Skill " & $i & " on Target " & Agent_GetAgentInfo($target, 'ID'))
                             ExitLoop ; Re-evaluate after successful skill usage (GCD/Priority)
@@ -243,27 +186,66 @@ Func Brawling_Fight($x)
                 EndIf
             Next
         EndIf
-        
-    Until Agent_GetAgentInfo($target, 'ID') = 0 OR GetPartyDead() OR TimerDiff($LocalTimer) > 180000
+
+    Until Agent_GetAgentInfo($target, 'ID') = 0 Or GetPartyDead() Or TimerDiff($LocalTimer) > 180000
 EndFunc
 
 Func Brawling_ClearArea($range = 1500)
     Out("Clearing area (Range: " & $range & ")...")
-    
+
     While True
         If GetPartyDead() Then Return False
-        
+
         Local $target = GetNearestEnemyToAgent(-2, $range, $GC_I_AGENT_TYPE_LIVING, 1, "Brawling_EnemyFilter")
-        
+
         If $target == 0 Then
             Out("Area clear.")
             Return True
         EndIf
-        
+
         Out("Engaging remaining enemy: " & Agent_GetAgentInfo($target, 'ID'))
         Brawling_Fight($range)
         Sleep(500)
     WEnd
 EndFunc
-#EndRegion
-#EndRegion
+#EndRegion Combat
+
+#Region Loot
+Func CountSlots()
+    Local $bag
+    Local $temp = 0
+    For $i = 1 To 4
+        $bag = Item_GetBagPtr($i)
+        $temp += Item_GetBagInfo($bag, "EmptySlots")
+    Next
+    Return $temp
+EndFunc   ;==>CountSlots
+
+Func PickUpLoot()
+    Local $lAgentArray = Item_GetItemArray()
+    Local $maxitems = $lAgentArray[0]
+
+    For $i = 1 To $maxitems
+        Local $aItemPtr = $lAgentArray[$i]
+        Local $aItemAgentID = Item_GetItemInfoByPtr($aItemPtr, "AgentID")
+
+        If GetIsDead(-2) Then Return
+        If $aItemAgentID = 0 Then ContinueLoop ; If Item is not on the ground
+
+        If CanPickUp($aItemPtr) Then
+            Item_PickUpItem($aItemAgentID)
+            Local $lDeadlock = TimerInit()
+            While GetItemAgentExists($aItemAgentID)
+                Sleep(100)
+                If GetIsDead(-2) Then Return
+                If TimerDiff($lDeadlock) > 10000 Then ExitLoop
+            WEnd
+        EndIf
+    Next
+EndFunc   ;==>PickUpLoot
+
+;~ Description: Test if an Item agent exists.
+Func GetItemAgentExists($aItemAgentID)
+    Return (Agent_GetAgentPtr($aItemAgentID) > 0 And $aItemAgentID < Item_GetMaxItems())
+EndFunc   ;==>GetItemAgentExists
+#EndRegion Loot

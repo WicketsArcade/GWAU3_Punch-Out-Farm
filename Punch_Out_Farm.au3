@@ -32,7 +32,7 @@ Global Const $MAP_ID_FRONIS = 704
 Global Const $Dialog_Intro = 0x835803
 Global Const $Dialog_AcceptQuest = 0x835801
 Global Const $Dialog_Enter = 0x85
-Global Const $Dialog_Reward = 0x835807
+Global Const $Dialog_Reward = 0x85
 
 ; === Skill & Stats ===
 Global Const $maxAllowdEnergy = 120
@@ -132,7 +132,7 @@ Func MainBotLoop()
             HandleInstance()
         Case Else
             Update("Traveling to Gunnar's Hold")
-            RndTravel($MAP_ID_GUUNAR)
+            Map_TravelTo($MAP_ID_GUUNAR)
             Sleep(5000)
     EndSwitch
 EndFunc
@@ -145,6 +145,14 @@ EndFunc
 ; =================================================================================================
 
 Func HandleOutpost()
+    Update("Handling Outpost Logic")
+
+    ; Check if we have a reward to claim from previous run
+    If ClaimReward() Then
+        Update("Reward Claimed. Switching District...")
+        Return ; Map change will trigger loop reset
+    EndIf
+
     Update("Preparing for Quest")
     
     ; 1. Leave Party
@@ -191,14 +199,20 @@ Func EnterInstance($QuestID)
     Agent_GoNPC($KilroyID)
     Sleep(1000)
     
-    ; 1. Intro Dialog
-    Game_Dialog($Dialog_Intro)
-    Sleep(500)
-    
-    ; 2. Accept Quest
-    Game_Dialog($Dialog_AcceptQuest)
-    Update("Quest Accepted")
-    Sleep(500)
+    ; Check if Quest is in log
+    If Quest_GetQuestInfo($QuestID, "QuestID") = 0 Then
+        Update("Quest not in log. Accepting...")
+        ; 1. Intro Dialog
+        Game_Dialog($Dialog_Intro)
+        Sleep(500)
+        
+        ; 2. Accept Quest
+        Game_Dialog($Dialog_AcceptQuest)
+        Update("Quest Accepted")
+        Sleep(500)
+    Else
+        Update("Quest already in log.")
+    EndIf
     
     ; 3. Enter Instance
     Game_Dialog($Dialog_Enter)
@@ -211,15 +225,24 @@ Func ClaimReward()
     Local $l_f_KilroyX = 17341.00
     Local $l_f_KilroyY = -4796.00
     
+    ; Only proceed if quest is ready to reward
+    If Not Quest_GetQuestInfo($FRONIS_QUEST, "CanReward") Then Return False
+    
     Local $KilroyID = GetNearestNPC($l_f_KilroyX, $l_f_KilroyY)
     If $KilroyID <> 0 Then
         Agent_ChangeTarget($KilroyID)
         Agent_GoNPC($KilroyID)
         Sleep(1000)
-        ; Claim Reward Dialog
-        Game_Dialog($Dialog_Reward) 
-        Sleep(1000)
+        
+        ; Double check and Claim
+        If Quest_GetQuestInfo($FRONIS_QUEST, "CanReward") Then
+             Game_Dialog($Dialog_Reward) 
+             Sleep(1000)
+             Map_RndTravel($MAP_ID_GUUNAR)
+             Return True
+        EndIf
     EndIf
+    Return False
 EndFunc
 #EndRegion Outpost Logic
 
@@ -244,10 +267,9 @@ Func RunPunchOutSequence()
     ; Fight initial spawns
     Update("Fighting at start position")
     Brawling_ClearArea(1500)
+       
+    PickUpLoot()
     
-    ; Cache skills again before first combat waypoint
-    UAI_CacheSkillBar()
-
     Update("Fronis Instance Combat Loop Started")
     Local $aWaypoints[10][2] = [ _
         [-15115.72, -15375.61], _
@@ -264,11 +286,6 @@ Func RunPunchOutSequence()
     For $i = 0 To UBound($aWaypoints) - 1
         Local $tX = $aWaypoints[$i][0]
         Local $tY = $aWaypoints[$i][1]
-        
-      ; Update("Moving to waypoint " & $i + 1)
-        
-        ; Log Movement Start
-        FileWriteLine(@ScriptDir & "\MovementLog.txt", "[" & @HOUR & ":" & @MIN & ":" & @SEC & "] START Move to WP " & $i + 1 & " (" & $tX & ", " & $tY & ") | Current: " & Agent_GetAgentInfo(-2, "X") & ", " & Agent_GetAgentInfo(-2, "Y"))
         
         ; Move with automated combat check
         Local $timer = TimerInit()
@@ -303,29 +320,21 @@ Func RunPunchOutSequence()
                 EndIf
                 
                 Brawling_ClearArea(1500)
-            EndIf
-            
-            ; Pick up loot while moving
-            PickUpLoot()
-            
+            EndIf        
             Sleep(100)
         WEnd
         
         ; Clear area at waypoint
         ; Update("Fighting at waypoint " & $i + 1)
-        FileWriteLine(@ScriptDir & "\MovementLog.txt", "[" & @HOUR & ":" & @MIN & ":" & @SEC & "] REACHED WP " & $i + 1 & ". Clearing area...")
         Brawling_ClearArea(1500)
-        
-        ; Update("Looting at waypoint " & $i + 1)
-        PickUpLoot()
-        
+              
         ; Pause based on health
         Local $fHP = Agent_GetAgentInfo(-2, "HP")
         If $fHP < 1.0 Then
              Update("Resting until full health...")
              Do
                  Sleep(500)
-                 $fHP = Agent_GetAgentInfo(-2, "HP")
+                                  $fHP = Agent_GetAgentInfo(-2, "HP")
              Until $fHP >= 0.95 ; Wait until 95%+ health
              Update("Health recovered. Resuming...")
         EndIf
@@ -345,9 +354,7 @@ Func RunPunchOutSequence()
         ; Keep trying to open chest until it's open (Gadget State changes)
         Local $l_timerChest = TimerInit()
         Do
-            Agent_GoNPC($l_i_SignpostID)
-            Sleep(500)
-            Game_Interact($l_i_SignpostID)
+            Agent_GoSignpost($l_i_SignpostID)
             Sleep(1000)
         Until TimerDiff($l_timerChest) > 5000 
     Else
@@ -370,24 +377,8 @@ Func RunPunchOutSequence()
     UpdateGUIStats()
     
     Update("Run complete. Resigning...")
-    RndTravel($MAP_ID_GUUNAR)
+    Map_TravelTo($MAP_ID_GUUNAR)
     Sleep(5000)
-    
-    ; === Post-Run Logic in Outpost ===
-    ; Wait to load back into Gunnar's Hold
-    If Map_WaitMapIsLoaded() Then
-        Update("Returned to Outpost. Claiming Reward...")
-        ClaimReward()
-        Update("Quest Completed")
-        
-        Update("Changing District...")
-        Local $currentDistrict = Map_GetCharacterInfo("District")
-        Local $newDistrict = ($currentDistrict = 1) ? 2 : 1 ; Toggle between Dist 1 and 2
-        Map_MoveMap($MAP_ID_GUUNAR, Map_GetCharacterInfo("Region"), $newDistrict, Map_GetCharacterInfo("Language"))
-        Map_WaitMapIsLoaded()
-        
-        Update("Restarting Loop...")
-    EndIf
 EndFunc
 #EndRegion Instance Logic
 
