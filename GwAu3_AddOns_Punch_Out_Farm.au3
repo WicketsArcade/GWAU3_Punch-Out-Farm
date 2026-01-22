@@ -309,7 +309,7 @@ Func CanPickUp($aItemPtr)
     ElseIf ($lRarity == $RARITY_Gold) Then ; gold items
         Return True
     ElseIf ($lRarity == $RARITY_Purple) Then ; purple items
-        Return False
+        Return True
     ElseIf ($lModelID == $ITEM_ID_Lockpicks) Then
         Return True ; Lockpicks
     ElseIf ($lModelID == 27044) Then

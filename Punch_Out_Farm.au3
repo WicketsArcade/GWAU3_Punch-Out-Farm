@@ -1,6 +1,6 @@
 #cs
 ;;; Punch Out Farmer = Created by MrDomRocks
-; You run in Normal Mode
+; Hard Mode and Normal Mode
 : Punch and Run
 #ce
 #RequireAdmin
@@ -25,12 +25,14 @@ Global $g_s_MainCharName = ""
 Global Const $MAP_ID_GUUNAR = 644
 Global Const $FRONIS_QUEST = 856
 Global Const $MAP_ID_FRONIS = 704
+Global Const $QuestStateIncomplete = 0x000000001
+Global Const $QuestStateComplete = 0x000000003
 
 ; === Dialog IDs ===
 Global Const $Dialog_Intro = 0x835803
 Global Const $Dialog_AcceptQuest = 0x835801
 Global Const $Dialog_Enter = 0x85
-Global Const $Dialog_Reward = 0x85
+Global Const $Dialog_Accept = 0x835807
 
 ; === Skill & Stats ===
 Global Const $maxAllowdEnergy = 120
@@ -132,7 +134,7 @@ Func MainBotLoop()
             Update("Traveling to Gunnar's Hold")
             Map_TravelTo($MAP_ID_GUUNAR)
             Sleep(5000)
-    EndSwitch
+        EndSwitch
 EndFunc
 #EndRegion Main Loop
 
@@ -145,29 +147,44 @@ EndFunc
 Func HandleOutpost()
     Update("Handling Outpost Logic")
 
-    ; Check if we have a reward to claim from previous run
-    If ClaimReward() Then
-        Update("Reward Claimed. Switching District...")
-        Return ; Map change will trigger loop reset
+    If CheckBagsFull() Then
+        HandleMerchant()
     EndIf
 
-    Update("Preparing for Quest")
-    
-    ; 1. Leave Party
-    Party_KickAllHeroes()
-    
-    ; 2. Equip Item
-    Item_EquipItem(68)
-    
-    ; 3. Move to Kilroy
+    ; 1. Move to Kilroy
     Local $l_f_KilroyX = 17341.00
     Local $l_f_KilroyY = -4796.00
     
     If Agent_GetDistanceToXY($l_f_KilroyX, $l_f_KilroyY) > 250 Then
+        Update("Moving to Kilroy...")
         Pathfinder_MoveTo($l_f_KilroyX, $l_f_KilroyY)
         Sleep(500)
+        Return
     EndIf
+
+    Update("Preparing for Quest")
     
+    ; 2. Leave Party
+    Party_KickAllHeroes()
+
+    ; 3. Check Quest State
+    Local $l_i_QuestState = Quest_GetQuestInfo($FRONIS_QUEST, "LogState")
+    Update("Quest State: " & $l_i_QuestState)
+    
+    If $l_i_QuestState = $QuestStateComplete Then
+        Update("Quest Completed - Claiming Reward")
+        Local $KilroyID = GetNearestNPC($l_f_KilroyX, $l_f_KilroyY)
+        If $KilroyID <> 0 Then
+            Agent_ChangeTarget($KilroyID)
+            Agent_GoNPC($KilroyID)
+            Sleep(500)
+            Game_Dialog($Dialog_Intro) ; Open dialog
+            Sleep(500)
+        EndIf
+        ClaimReward()
+        Return ; Restart logic
+    EndIf
+
     ; 4. Handle Quest/Dialog Logic
     If Not EnterInstance($FRONIS_QUEST) Then
         Update("Failed to enter instance, retrying...")
@@ -197,20 +214,15 @@ Func EnterInstance($QuestID)
     Agent_GoNPC($KilroyID)
     Sleep(1000)
     
-    ; Check if Quest is in log
-    If Quest_GetQuestInfo($QuestID, "QuestID") = 0 Then
-        Update("Quest not in log. Accepting...")
-        ; 1. Intro Dialog
-        Game_Dialog($Dialog_Intro)
-        Sleep(500)
-        
-        ; 2. Accept Quest
-        Game_Dialog($Dialog_AcceptQuest)
-        Update("Quest Accepted")
-        Sleep(500)
-    Else
-        Update("Quest already in log.")
-    EndIf
+    Update("Accepting Quest...")
+    ; 1. Intro Dialog
+    Game_Dialog($Dialog_Intro)
+    Sleep(500)
+    
+    ; 2. Accept Quest
+    Game_Dialog($Dialog_AcceptQuest)
+    Update("Quest Accepted")
+    Sleep(500)
     
     ; 3. Enter Instance
     Game_Dialog($Dialog_Enter)
@@ -218,33 +230,107 @@ Func EnterInstance($QuestID)
     
     Return True
 EndFunc
-
-Func ClaimReward()
-    Local $l_f_KilroyX = 17341.00
-    Local $l_f_KilroyY = -4796.00
-    
-    ; Only proceed if quest is ready to reward
-    If Not Quest_GetQuestInfo($FRONIS_QUEST, "CanReward") Then Return False
-    
-    Local $KilroyID = GetNearestNPC($l_f_KilroyX, $l_f_KilroyY)
-    If $KilroyID <> 0 Then
-        Agent_ChangeTarget($KilroyID)
-        Agent_GoNPC($KilroyID)
-        Sleep(1000)
-        
-        ; Double check and Claim
-        If Quest_GetQuestInfo($FRONIS_QUEST, "CanReward") Then
-             Game_Dialog($Dialog_Reward) 
-             Sleep(1000)
-             Map_RndTravel($MAP_ID_GUUNAR)
-             Return True
-        EndIf
-    EndIf
-    Return False
-EndFunc
 #EndRegion Outpost Logic
 
-#Region Instance Logic
+#Region Claim Reward Logic
+Func ClaimReward()
+    Game_Dialog($Dialog_Accept)
+    Sleep(1000)
+    Map_RndTravel($MAP_ID_GUUNAR)   
+EndFunc
+#EndRegion Claim Reward Logic
+
+#Region Merchant Logic
+Func CheckBagsFull()
+    Local $l_i_EmptySlots = 0
+    For $i = 1 To 4
+        $l_i_EmptySlots += Item_GetBagInfo(Item_GetBagPtr($i), "EmptySlots")
+    Next
+    ; Trigger if 4 or fewer slots are empty (Covering the "3-4 empty slots" requirement)
+    Return ($l_i_EmptySlots <= 4)
+EndFunc
+
+Func HandleMerchant()
+    Update("Bags full, going to merchant...")
+    Local $l_f_MerchX = 17664.00
+    Local $l_f_MerchY = -7724.00
+    
+    If Agent_GetDistanceToXY($l_f_MerchX, $l_f_MerchY) > 250 Then
+        Pathfinder_MoveTo($l_f_MerchX, $l_f_MerchY)
+        Sleep(1000)
+    EndIf
+    
+    Local $MerchID = GetNearestNPC($l_f_MerchX, $l_f_MerchY)
+    If $MerchID <> 0 Then
+        Agent_ChangeTarget($MerchID)
+        Agent_GoNPC($MerchID)
+        Sleep(2000)
+        
+        If GUICtrlRead($gIdentifyCheckbox) = $GUI_CHECKED Then
+            IdentifyCycle()
+        EndIf
+        
+        If GUICtrlRead($gSellCheckbox) = $GUI_CHECKED Then
+            SellCycle()
+        EndIf
+    Else
+        Update("Merchant not found!")
+    EndIf
+EndFunc
+
+Func IdentifyCycle()
+    Update("Identifying items...")
+    Local $l_a_Bags = [1, 2, 3, 4]
+    For $bagIndex In $l_a_Bags
+        Local $l_p_Bag = Item_GetBagPtr($bagIndex)
+        If $l_p_Bag = 0 Then ContinueLoop
+        Local $l_i_Slots = Item_GetBagInfo($l_p_Bag, 'Slots')
+        For $slot = 1 To $l_i_Slots
+            Local $l_p_Item = Item_GetItemBySlot($bagIndex, $slot)
+            If $l_p_Item = 0 Then ContinueLoop
+            
+            Local $l_b_Identified = Item_GetItemInfoByPtr($l_p_Item, 'IsIdentified')
+            If Not $l_b_Identified Then
+                Item_IdentifyItem($l_p_Item)
+                Sleep(250)
+            EndIf
+        Next
+    Next
+EndFunc
+
+Func SellCycle()
+    Update("Selling items...")
+    Local $l_a_Bags = [1, 2, 3, 4] 
+    For $bagIndex In $l_a_Bags
+        Local $l_p_Bag = Item_GetBagPtr($bagIndex)
+        If $l_p_Bag = 0 Then ContinueLoop
+        Local $l_i_Slots = Item_GetBagInfo($l_p_Bag, 'Slots')
+        For $slot = 1 To $l_i_Slots
+            Local $l_p_Item = Item_GetItemBySlot($bagIndex, $slot)
+            If $l_p_Item = 0 Then ContinueLoop
+            
+            Local $l_b_Identified = Item_GetItemInfoByPtr($l_p_Item, 'IsIdentified')
+            Local $l_i_Rarity = Item_GetItemInfoByPtr($l_p_Item, 'Rarity')
+            
+            ; Only sell White, Blue, Purple
+            If $l_b_Identified And ($l_i_Rarity = $GC_I_RARITY_WHITE Or $l_i_Rarity = $GC_I_RARITY_BLUE Or $l_i_Rarity = $GC_I_RARITY_PURPLE) Then
+                 ; Exclude Kits and Dyes
+                 Local $l_i_Type = Item_GetItemInfoByPtr($l_p_Item, 'ItemType')
+                 Local $l_i_ModelID = Item_GetItemInfoByPtr($l_p_Item, 'ModelID')
+                 
+                 If $l_i_Type <> $GC_I_TYPE_KIT And $l_i_Type <> $GC_I_TYPE_DYE Then
+                    ; Exclude Lockpicks, Stone Summit Emblems, and Dwarven Ales
+                    If $l_i_ModelID <> 22751 And $l_i_ModelID <> 27044 And $l_i_ModelID <> 5585 And $l_i_ModelID <> 24593 Then
+
+                        Merchant_SellItem($l_p_Item)
+                        Sleep(250)
+                    EndIf
+                 EndIf
+            EndIf
+        Next
+    Next
+EndFunc
+#EndRegion Merchant Logic
 ; =================================================================================================
 ; Instance Logic
 ; Handles the main farming sequence inside Fronis Irontoe's Lair
@@ -258,7 +344,7 @@ Func RunPunchOutSequence()
     ; Move to safe start position
     Pathfinder_MoveTo(-16919.56, -13485.12)
     Sleep(500)
-    PickUpLoot()
+    
     ; Cache skills ONCE at start
     UAI_CacheSkillBar()
 
@@ -266,6 +352,7 @@ Func RunPunchOutSequence()
     Update("Fighting at start position")
     Brawling_ClearArea(1500)
     Update("Started")
+    PickUpLoot()
     Local $aWaypoints[10][2] = [ _
         [-15115.72, -15375.61], _
         [-11299.54, -16402.40], _
@@ -297,16 +384,17 @@ Func RunPunchOutSequence()
             ; Move command
             Pathfinder_MoveTo($tX, $tY)
             
+            ; Check for loot if safe
+            If GetNumberOfFoesInRangeOfAgent(-2, 1000) < 1 Then
+                PickUpLoot()
+            EndIf
+            
             ; Timeout check
             If TimerDiff($timer) > 25000 Then 
                 Update("Failed to reach waypoint " & $i + 1 & " - Timeout")
-                FileWriteLine(@ScriptDir & "\MovementLog.txt", "[" & @HOUR & ":" & @MIN & ":" & @SEC & "] FAILED Move to WP " & $i + 1 & " - Timeout. Stuck at: " & Agent_GetAgentInfo(-2, "X") & ", " & Agent_GetAgentInfo(-2, "Y"))
                 ExitLoop
             EndIf
-            
-            ; Log intermediate position
-            FileWriteLine(@ScriptDir & "\MovementLog.txt", "[" & @HOUR & ":" & @MIN & ":" & @SEC & "] MOVING... Current: " & Agent_GetAgentInfo(-2, "X") & ", " & Agent_GetAgentInfo(-2, "Y"))
-            
+                       
             ; Explicit combat check during movement
             If GetNearestEnemyToCoords(Agent_GetAgentInfo(-2, "X"), Agent_GetAgentInfo(-2, "Y"), 1000) <> 0 Then
                 ; Attempt to use Skill 1 (Sprint/Block) while moving if available
@@ -344,6 +432,12 @@ Func RunPunchOutSequence()
         Update("Interacting with final signpost")
         Agent_ChangeTarget($l_i_SignpostID)
         Pathfinder_MoveTo(Agent_GetAgentInfo($l_i_SignpostID, "X"), Agent_GetAgentInfo($l_i_SignpostID, "Y"))
+        
+        ; Loot check at final signpost
+        If GetNumberOfFoesInRangeOfAgent(-2, 1000) < 1 Then
+            PickUpLoot()
+        EndIf
+        
         Sleep(500)
         
         ; Keep trying to open chest until it's open (Gadget State changes)
@@ -359,16 +453,39 @@ Func RunPunchOutSequence()
     Sleep(2000)
     Update("Fronis Instance Completed")
     Update("Picking up ale")   
+    
+    ; Loop until no more relevant loot is found
+    Local $l_timerLoot = TimerInit()
+    While True
+        PickUpLoot()
+        Sleep(500)
+        
+        ; Check if there is any lootable item left nearby
+        Local $bLootLeft = False
+        Local $lAgentArray = Item_GetItemArray()
+        Local $maxitems = $lAgentArray[0]
+        
+        For $i = 1 To $maxitems
+            Local $aItemPtr = $lAgentArray[$i]
+            If CanPickUp($aItemPtr) Then
+                $bLootLeft = True
+                ExitLoop
+            EndIf
+        Next
+        
+        If Not $bLootLeft Then ExitLoop
+        If TimerDiff($l_timerLoot) > 10000 Then ExitLoop ; Safety timeout 10s
+    WEnd
+
     $g_i_Runs += 1
     $g_i_Ales += 1 ; Increment count (Assuming success)
     UpdateGUIStats()
     
     Update("Run complete. Resigning...")
     Map_TravelTo($MAP_ID_GUUNAR)
+    
     Sleep(5000)
 EndFunc
-#EndRegion Instance Logic
-
 #Region Helper Functions
 ; =================================================================================================
 ; Helper Functions
@@ -382,7 +499,7 @@ EndFunc
 
 Func UpdateGUIStats()
     GUICtrlSetData($RunsLabel, "Runs: " & $g_i_Runs)
-    GUICtrlSetData($FailuresLabel, "Failures: " & $g_i_Fails)
+    ; GUICtrlSetData($FailuresLabel, "Failures: " & $g_i_Fails)
     GUICtrlSetData($Ales, "Ales: " & $g_i_Ales)
     
     Local $iDiff = TimerDiff($g_i_StartTime)
