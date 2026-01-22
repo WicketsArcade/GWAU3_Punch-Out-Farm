@@ -10,6 +10,24 @@ I have also included a Hard Mode option, please be advised it is recommended tha
 
 <img width="531" height="261" alt="image" src="https://github.com/user-attachments/assets/8ed39e8d-e2c8-43ab-baa4-3a89f02e572b" />
 
-I will be actively working on additional features for this bot. Including a check that if downed too many times in a row for the bot to move thje character out of agro range to allow Kilroy to revive.
+I will be actively working on additional features for this bot. Including a check that if downed too many times in a row for the bot to move the character out of agro range to allow Kilroy to revive.
 
 As ever use at your own risk. Happy Farming!
+
+## installation
+
+Download the repo zip. Extract to your GwAu3-main folder location. I have listed the includes below for reference to file placement and adjustments to includes if required.
+
+#include "..\API\_GwAu3.au3"
+
+#include "AddOns\GwAu3_AddOns_Punch_Out_Farm.au3"
+
+#include "GUI\GUI_Punch_Out_Farm.au3"
+
+#include "..\API\SmartCast\_UtilityAI.au3"
+
+#include "..\API\Pathfinding\Pathfinder_Movements.au3"
+
+
+Coded using TRAE, GUI made using KODA GUI.
+Once again thanks for the support GwAu3 Community. <3
