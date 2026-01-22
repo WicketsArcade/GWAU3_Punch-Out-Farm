@@ -64,6 +64,7 @@ EndIf
 GUISetOnEvent($GUI_EVENT_CLOSE, "CloseBot", $Form1)
 GUICtrlSetOnEvent($Start, "ToggleBot")
 GUICtrlSetOnEvent($RefreshButton, "RefreshCharacters")
+GUICtrlSetOnEvent($gHardModeCheckbox, "OnHardModeToggle")
 
 Func RefreshCharacters()
     Local $sLogedChars = Scanner_GetLoggedCharNames()
@@ -104,6 +105,17 @@ EndFunc
 
 Func CloseBot()
     Exit
+EndFunc
+
+Func OnHardModeToggle()
+    If GUICtrlRead($gHardModeCheckbox) = $GUI_CHECKED Then
+        MsgBox(64, "Hard Mode Advice", "For best performance your character should have:" & @CRLF & _
+        "5x Stalwart Insignias" & @CRLF & _
+        "Secondary Profession Assassin for Dagger Mastery" & @CRLF & _
+        "Thunderfist Brass Knuckles with Sundering or Furious Mods" & @CRLF & _
+        "Dagger Handle of Shelter" & @CRLF & _
+        "Brawn over Brains Inscription")
+    EndIf
 EndFunc
 #EndRegion Event Handlers
 
@@ -146,6 +158,20 @@ EndFunc
 
 Func HandleOutpost()
     Update("Handling Outpost Logic")
+
+    ; Hard Mode Logic
+    Local $bHardMode = (GUICtrlRead($gHardModeCheckbox) = $GUI_CHECKED)
+    Local $bCurrentHM = Party_GetPartyContextInfo("IsHardMode")
+
+    If $bHardMode And Not $bCurrentHM Then
+        Update("Switching to Hard Mode")
+        Game_SwitchMode(1)
+        Sleep(3000) ; Wait for switch
+    ElseIf Not $bHardMode And $bCurrentHM Then
+        Update("Switching to Normal Mode")
+        Game_SwitchMode(0)
+        Sleep(3000) ; Wait for switch
+    EndIf
 
     If CheckBagsFull() Then
         HandleMerchant()

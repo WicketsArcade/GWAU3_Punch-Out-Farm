@@ -1,3 +1,8 @@
+#cs
+;;; Punch Out Farmer = Created by MrDomRocks
+; Hard Mode and Normal Mode
+: Punch and Run
+#ce
 #include-once
 
 ; === Constants ===
