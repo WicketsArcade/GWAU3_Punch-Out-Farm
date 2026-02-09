@@ -298,7 +298,7 @@ Func HandleMerchant()
         EndIf
         
         If GUICtrlRead($gSellCheckbox) = $GUI_CHECKED Then
-            ; Check for Superior Identification Kit in Bag 1 Slot 2
+            ; Check for Identification Kit in Bag 1 Slot 2
             Local $l_p_Bag1 = Item_GetBagPtr(1)
             If $l_p_Bag1 <> 0 Then
                 Local $l_p_Slot2 = Item_GetItemBySlot(1, 2)
@@ -306,13 +306,13 @@ Func HandleMerchant()
                 ; If slot is empty or contains wrong item, try to find one and move it there
                 Local $bCorrectKit = False
                 If $l_p_Slot2 <> 0 Then
-                    If Item_GetItemInfoByPtr($l_p_Slot2, 'ModelID') = $GC_I_MODELID_SUPERIOR_IDENTIFICATION_KIT Then
+                    If Item_GetItemInfoByPtr($l_p_Slot2, 'ModelID') = $GC_I_MODELID_IDENTIFICATION_KIT Then
                         $bCorrectKit = True
                     EndIf
                 EndIf
                 
                 If Not $bCorrectKit Then
-                    Update("Restocking Superior ID Kit to Bag 1 Slot 2...")
+                    Update("Restocking ID Kit to Bag 1 Slot 2...")
                     ; Scan all bags for a kit
                     Local $bFound = False
                     For $b = 1 To 4
@@ -321,7 +321,7 @@ Func HandleMerchant()
                         Local $l_i_Slots = Item_GetBagInfo($l_p_Bag, 'Slots')
                         For $s = 1 To $l_i_Slots
                             Local $l_p_Item = Item_GetItemBySlot($b, $s)
-                            If $l_p_Item <> 0 And Item_GetItemInfoByPtr($l_p_Item, 'ModelID') = $GC_I_MODELID_SUPERIOR_IDENTIFICATION_KIT Then
+                            If $l_p_Item <> 0 And Item_GetItemInfoByPtr($l_p_Item, 'ModelID') = $GC_I_MODELID_IDENTIFICATION_KIT Then
                                 Item_MoveItem($l_p_Item, 1, 2) ; Move to Bag 1 Slot 2
                                 Sleep(500)
                                 $bFound = True
@@ -332,13 +332,10 @@ Func HandleMerchant()
                     
                     ; If still not found, buy one (if merchant window is open)
                     If Not $bFound Then
-                        Update("Buying Superior ID Kit...")
+                        Update("Buying ID Kit...")
                         ; Assumes merchant window is open and kit is available
-                        ; 5899 is the ModelID, usually found in merchant tab
-                        ; This requires specific merchant logic which is complex, 
-                        ; for now we assume user should have one or we just skip if not found.
-                        ; Adding a simple buy attempt if possible or just logging warning
-                        Merchant_BuyItem($GC_I_MODELID_SUPERIOR_IDENTIFICATION_KIT, 1) 
+                        ; 2989 is the ModelID
+                        Merchant_BuyItem($GC_I_MODELID_IDENTIFICATION_KIT, 1) 
                         Sleep(1000)
                         ; Try to move it again after buying
                         For $b = 1 To 4
@@ -347,7 +344,7 @@ Func HandleMerchant()
                             Local $l_i_Slots = Item_GetBagInfo($l_p_Bag, 'Slots')
                             For $s = 1 To $l_i_Slots
                                 Local $l_p_Item = Item_GetItemBySlot($b, $s)
-                                If $l_p_Item <> 0 And Item_GetItemInfoByPtr($l_p_Item, 'ModelID') = $GC_I_MODELID_SUPERIOR_IDENTIFICATION_KIT Then
+                                If $l_p_Item <> 0 And Item_GetItemInfoByPtr($l_p_Item, 'ModelID') = $GC_I_MODELID_IDENTIFICATION_KIT Then
                                     Item_MoveItem($l_p_Item, 1, 2)
                                     Sleep(500)
                                     ExitLoop 2
@@ -378,7 +375,7 @@ Func IdentifyCycle()
             
             Local $l_b_Identified = Item_GetItemInfoByPtr($l_p_Item, 'IsIdentified')
             If Not $l_b_Identified Then
-                Item_IdentifyItem($l_p_Item)
+                Item_IdentifyItem($l_p_Item, "Normal")
                 Sleep(250)
             EndIf
         Next
@@ -407,7 +404,7 @@ Func SellCycle()
                  
                  If $l_i_Type <> $GC_I_TYPE_KIT And $l_i_Type <> $GC_I_TYPE_DYE Then
                     ; Exclude Lockpicks, Stone Summit Emblems, Dwarven Ales, and Superior Identification Kits
-                    If $l_i_ModelID <> 22751 And $l_i_ModelID <> 27044 And $l_i_ModelID <> 5585 And $l_i_ModelID <> 24593 And $l_i_ModelID <> $GC_I_MODELID_SUPERIOR_IDENTIFICATION_KIT Then
+                    If $l_i_ModelID <> 22751 And $l_i_ModelID <> 27044 And $l_i_ModelID <> 5585 And $l_i_ModelID <> 24593 And $l_i_ModelID <> $GC_I_MODELID_SUPERIOR_IDENTIFICATION_KIT And $l_i_ModelID <> $GC_I_MODELID_IDENTIFICATION_KIT Then
 
                         Merchant_SellItem($l_p_Item)
                         Sleep(250)
