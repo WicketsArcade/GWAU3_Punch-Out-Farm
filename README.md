@@ -17,15 +17,7 @@ As ever use at your own risk. Happy Farming!
 
 Download the repo zip. Extract to your GwAu3-main folder location. I have listed the includes below for reference to file placement and adjustments to includes if required.
 
-#include "..\API\_GwAu3.au3"
-
-#include "AddOns\GwAu3_AddOns_Punch_Out_Farm.au3"
-
-#include "GUI\GUI_Punch_Out_Farm.au3"
-
-#include "..\API\SmartCast\_UtilityAI.au3"
-
-#include "..\API\Pathfinding\Pathfinder_Movements.au3"
+Copy the Scripts folder directly into GwAu3-main. You will now have an additional folder Punch_Out_Farm bot launches from there.
 
 
 Coded using TRAE, GUI made using KODA GUI.

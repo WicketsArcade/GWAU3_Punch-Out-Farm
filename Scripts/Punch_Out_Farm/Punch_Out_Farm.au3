@@ -9,13 +9,13 @@
 #include "..\..\API\_GwAu3.au3"
 #include "GwAu3_AddOns_Punch_Out_Farm.au3"
 #include "GUI_Punch_Out_Farm.au3"
-#include "..\..\API\SmartCast\_UtilityAI.au3"
-#include "..\..\API\Pathfinding\Pathfinder_Movements.au3"
+#include "..\..\API\Plugins\UtilityAI\_UtilityAI.au3"
+#include "..\..\API\Plugins\Pathfinder\Pathfinder_Movements.au3"
 #EndRegion Includes
 
 #Region Global Constants & Variables
 ; === Pathfinding DLL ===
-Global $DLL_PATH = "..\..\API\Pathfinding\GWPathfinder.dll"
+Global $DLL_PATH = "..\..\API\Plugins\Pathfinder\GWPathfinder.dll"
 
 ; === Bot Settings ===
 Global Const $BotTitle = "Punch Out Farmer by MrDomRocks"
